@@ -1,0 +1,15 @@
+/*
+ * hdc3022_driver.h
+ *
+ *  Created on: Mar 18, 2025
+ *      Author: 91748
+ */
+
+#ifndef INC_HDC3022_DRIVER_H_
+#define INC_HDC3022_DRIVER_H_
+
+// Prototypes
+void hdc3022_init(void);
+
+
+#endif /* INC_HDC3022_DRIVER_H_ */

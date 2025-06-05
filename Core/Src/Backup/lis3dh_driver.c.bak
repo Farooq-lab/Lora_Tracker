@@ -1,0 +1,119 @@
+/*
+ * lis3dh_driver.c
+ *
+ *  Created on: Mar 10, 2025
+ *      Author: 91748
+ */
+
+// Includes
+#include "lis3dh_driver.h"
+#include "stdio.h"
+#include "string.h"
+#include "stdbool.h"
+
+// Macros
+#define LIS3DH_ADDRESS  0x18 << 1
+#define OUT_X_L 0x28
+#define OUT_Y_L 0x2A
+#define OUT_Z_L 0x2C
+#define WHO_AM_I (uint8_t *)0x0F
+
+extern I2C_HandleTypeDef hi2c2;
+uint8_t who_am_i = 0x0F;
+uint8_t CTRL_REG_1 = 0x20 ;
+uint8_t var = 0;
+
+
+void lis3dh_init(void)						// Write initialization sequence for the accelerometer
+{
+
+	uint8_t buffer[2] ;
+	buffer[0] = CTRL_REG_1 ;
+	buffer[1] = 0x97 ;
+
+	HAL_I2C_Master_Transmit(&hi2c2, LIS3DH_ADDRESS, buffer, 2, 100 );
+
+}
+
+
+void lis3dh_setODR(uint8_t)					// Set the output data rate (ODR) of the accelerometer
+{
+
+}
+
+/*	OUT_X_L (28h), OUT_X_H (29h)
+ * 	OUT_Y_L (2Ah), OUT_Y_H (2Bh)
+ * 	OUT_Z_L (2Ch), OUT_Z_H (2Dh)
+ * */
+//  function --> Reading Accelerometer Data
+void lis3dh_read_data(uint8_t reg, float *final_value, bool IsAccel)   				// Read data from the sensor
+{
+	// Read two bytes of data (LSB and MSB) and store in a 16 bit data structure(raw_accel)
+	uint8_t firstHalf;
+	uint8_t secondHalf;
+	uint16_t raw_accel;
+
+	HAL_I2C_Master_Transmit(&hi2c2, (LIS3DH_ADDRESS), &reg, 2, 100);	// Ask for the 1st half of the data
+	HAL_I2C_Master_Receive(&hi2c2, (LIS3DH_ADDRESS), &firstHalf, 2, 100);
+	reg |= 0x01;														// Set the LSB to jump from 1st half to 2nd half
+	HAL_I2C_Master_Transmit(&hi2c2, (LIS3DH_ADDRESS), &reg, 2, 100);	// Getting the 2nd half of the data
+	HAL_I2C_Master_Receive(&hi2c2, (LIS3DH_ADDRESS), &secondHalf, 2, 100);
+	raw_accel = (secondHalf << 8) | firstHalf; 										// Combine 1st & 2nd halves - (8+8 = 16 bit data)
+	lis3dh_calc_value(raw_accel, final_value, IsAccel) ; 			    // Calling CalcAcc function for Calibration
+
+}
+
+//  function --> Calculating acc values
+void lis3dh_calc_value(uint16_t raw_value, float *final_value, bool isAccel)  	// Convert with respect to the value being temperature or acceleration reading
+{
+
+	float scaling;
+	float senstivity = 0.004f; // g per unit
+	if (isAccel == true)
+	{
+		scaling = 64 / senstivity;
+	}
+	else
+	{
+		scaling = 64;
+	}
+
+	// raw_value is signed
+	*final_value = (float) ((int16_t) raw_value) / scaling;
+}
+
+//  function --> Check Acknowlegdement
+void  who_am_i_read(void)
+{
+	int txStatus = HAL_I2C_Master_Transmit(&hi2c2, LIS3DH_ADDRESS, &who_am_i, 1,100);
+	if(txStatus == HAL_OK)
+	{
+		printf("Acknowledgment Status --> Successful --> %d \r\n",txStatus);
+		HAL_I2C_Master_Receive(&hi2c2, LIS3DH_ADDRESS, &var, 1,HAL_MAX_DELAY);
+		printf("WHO AM I  --> %x\r\n\n", var);														// WHO AM I success return value --> 0x33
+	}
+	else if(txStatus == HAL_ERROR)
+	{
+		printf("Acknowledgment Status --> error --> %d \r\n",txStatus);
+	}
+	else
+	{
+		printf("Acknowledgment Status --> Busy --> %d \r\n",txStatus);
+	}
+}
+
+
+// function --> Read Acceleration data
+AccValues_t readAccelerationData_XYZ(void)
+{
+	// Create a instance of type AccValue_t
+	AccValues_t AccValues ;
+
+	lis3dh_read_data(OUT_X_L, &AccValues.x_accel, true);
+	lis3dh_read_data(OUT_Y_L, &AccValues.y_accel, true);		   									// Reading X,Y,Z values --> Calling the read function
+	lis3dh_read_data(OUT_Z_L, &AccValues.z_accel, true);
+
+	return AccValues ;
+}
+
+

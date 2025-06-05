@@ -1,0 +1,36 @@
+/*
+ * hdc3022dejr.c
+ *
+ *  Created on: Jun 5, 2025
+ *      Author: Hariharan Veerappan
+ */
+#include "hdc3022dejr.h"
+
+// Macros
+#define HDC_ADDRESS 0x44
+#define READ_MANUFACTURE_ID 0x3781
+#define AUTO_MODE 0xE000
+#define AUTO_MODE_CONFIG 0x0023
+#define AUTO_MODE_CONFIG_CRC 0x54
+#define EXIT_AUTO_MODE 0x3093
+#define CONFIGURE_ALERT_SET_HIGH
+#define CONFIGURE_ALERT_SET_LOW
+#define RESET 0x30A2
+
+extern I2C_HandleTypeDef hi2c2;
+uint16_t registerAddress;
+uint8_t regAddressBuffer[2] ;
+
+void hdc3022_init(void)
+{
+	registerAddress = READ_MANUFACTURE_ID ;
+
+	// Extract MSB and LSB
+	regAddressBuffer[0] = ((registerAddress >> 8) & 0xFF);													// MSB
+	regAddressBuffer[1] = (registerAddress & 0xFF);															// LSB
+
+	// Transmit the buffer
+	HAL_I2C_Master_Transmit(&hi2c2 , HDC_ADDRESS , regAddressBuffer , 2 , 100);
+}
+
+
